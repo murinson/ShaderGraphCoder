@@ -79,6 +79,7 @@ public class SGNode: Identifiable, Equatable, Hashable {
 
 public enum SGValueSource {
     case nodeOutput(_ node: SGNode, _ outputName: String)
+    case nodeGraphInput(_ nodeGraph: SGNodeGraph, _ inputName: String)
     case constant(_ value: SGConstantValue)
     case parameter(name: String, defaultValue: SGConstantValue)
     case error(_ error: String, values: [SGValue?])
@@ -88,6 +89,11 @@ public enum SGValueSource {
         case .nodeOutput(let node, let outputName):
             if let o = node.findOutput(name: outputName) {
                 return o.dataType
+            }
+            return .float
+        case .nodeGraphInput(let nodeGraph, let inputName):
+            if let i = nodeGraph.findInput(name: inputName) {
+                return i.dataType
             }
             return .float
         case .constant(let value):

@@ -97,6 +97,8 @@ public extension SGValueSource {
             return ivalue.usda
         case .nodeOutput(let inode, let inodeOut):
             return "</Root/\(materialName)/\(inode.usdaName).outputs:\(inodeOut)>"
+        case .nodeGraphInput(let nodeGraph, let inputName):
+            return "</Root/\(nodeGraph.name).inputs:\(inputName)>"
         case .parameter(name: let name, defaultValue: _):
             return "</Root/\(materialName).inputs:\(name)>"
         case .error(let error, _):
@@ -105,7 +107,7 @@ public extension SGValueSource {
     }
 }
 
-public func getUSDA(materialName: String, surface: SGToken?, geometryModifier: SGToken?) -> (String, [String: SGTextureSource], [String]) {
+public func getUSDA(materialName: String, surface: SGToken?, geometryModifier: SGToken?, nodeGraphs: [SGNodeGraph]) -> (String, [String: SGTextureSource], [String]) {
     var lines: [String] = []
     func line(_ text: String) {
         lines.append(text)
@@ -151,6 +153,34 @@ public func getUSDA(materialName: String, surface: SGToken?, geometryModifier: S
         line("        token outputs:realitykit:vertex")
     }
     
+    writeShaders(for: materialName, outputNodes: outputNodes, line: line)
+    
+    line("    }") // Material
+    
+    for ng in nodeGraphs {
+        line("    def NodeGraph \"\(ng.name)\" (")
+        line("        active = true")
+        line("    )")
+        line("    {")
+        for i in ng.inputs {
+            line("        \(i.dataType.usda) inputs:\(i.name) = \(i.dataType.defaultValue.usda)")
+        }
+        for o in ng.outputs {
+            line("        \(o.value.dataType.usda) outputs:\(o.name)")
+            line("        \(o.value.dataType.usda) outputs:\(o.name).connect = \(o.value.source.getUSDAReference(materialName: ng.name))")
+        }
+        
+        writeShaders(for: ng.name, outputNodes: ng.outputs.compactMap { $0.value.node }, line: line)
+        
+        line("    }") // NodeGraph
+    }
+    
+    line("}") // Xform
+    
+    return (lines.joined(separator: "\n"), textureSources, errors)
+}
+
+fileprivate func writeShaders(for entityName: String, outputNodes: [SGNode], line: (String) -> ()) {
     var nodesToWrite: [SGNode] = outputNodes
     var nodesWritten: Set<SGNode> = []
     while nodesToWrite.count > 0 {
@@ -158,20 +188,29 @@ public func getUSDA(materialName: String, surface: SGToken?, geometryModifier: S
         nodesToWrite.remove(at: 0)
         nodesWritten.insert(node)
         line("")
-        line("        def Shader \"\(node.usdaName)\"")
-        line("        {")
-        line("            uniform token info:id = \"\(node.nodeType)\"")
+        
+        if let referenceNode = node as? SGNodeGraphReference {
+            line("        def \"\(referenceNode.usdaName)\" (")
+            line("            active = true")
+            line("            instanceable = true")
+            line("            references = </Root/\(referenceNode.nodeGraph.name)>")
+            line("        )")
+            line("        {")
+        } else {
+            line("        def Shader \"\(node.usdaName)\"")
+            line("        {")
+            line("            uniform token info:id = \"\(node.nodeType)\"")
+        }
+        
         for i in node.inputs {
             var decl = "\(i.dataType.usda) inputs:\(i.name)"
             if let c = i.value?.source {
-                if case .nodeOutput = c {
-                    decl += ".connect"
-                }
-                else if case .parameter = c {
-                    decl += ".connect"
+                switch c {
+                case .nodeOutput, .parameter, .nodeGraphInput: decl += ".connect"
+                default: break
                 }
             }
-            if let value = i.value?.source.getUSDAReference(materialName: materialName) {
+            if let value = i.value?.source.getUSDAReference(materialName: entityName) {
                 line("            \(decl) = \(value)")
             }
             else {
@@ -191,9 +230,4 @@ public func getUSDA(materialName: String, surface: SGToken?, geometryModifier: S
             }
         }
     }
-    
-    line("    }")
-    line("}")
-    
-    return (lines.joined(separator: "\n"), textureSources, errors)
 }
