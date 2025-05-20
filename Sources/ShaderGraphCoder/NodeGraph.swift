@@ -52,6 +52,10 @@ public class SGNodeGraph {
     public func findInput(name: String) -> Input? {
         inputs.first { $0.name == name }
     }
+    
+    public func findOutput(name: String) -> Output? {
+        outputs.first { $0.name == name }
+    }
 }
 
 extension SGDataType {
@@ -85,19 +89,10 @@ extension SGDataType {
 
 public class SGNodeGraphReference: SGNode {
     public let nodeGraph: SGNodeGraph
-//    public let isDummy: Bool
     
     public init(nodeGraph: SGNodeGraph, inputs: [Input]) {
         self.nodeGraph = nodeGraph
-//        self.isDummy = false
         
         super.init(nodeType: "NodeGraphReference", inputs: inputs, outputs: [])
     }
-    
-//    public init(dummyName: String) {
-//        self.nodeGraph = SGNodeGraph(name: dummyName)
-//        self.isDummy = true
-//        
-//        super.init(nodeType: "NodeGraphReference", inputs: [], outputs: [])
-//    }
 }

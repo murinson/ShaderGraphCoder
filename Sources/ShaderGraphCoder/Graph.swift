@@ -87,8 +87,14 @@ public enum SGValueSource {
     public var dataType: SGDataType {
         switch self {
         case .nodeOutput(let node, let outputName):
-            if let o = node.findOutput(name: outputName) {
-                return o.dataType
+            if let node = node as? SGNodeGraphReference {
+                if let o = node.nodeGraph.findOutput(name: outputName) {
+                    return o.value.dataType
+                }
+            } else {
+                if let o = node.findOutput(name: outputName) {
+                    return o.dataType
+                }
             }
             return .float
         case .nodeGraphInput(let nodeGraph, let inputName):
